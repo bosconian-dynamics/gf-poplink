@@ -1,0 +1,9 @@
+{
+  "[php]": {
+    "editor.defaultFormatter": "wongjn.php-sniffer"
+  },
+  "phpSniffer.executablesFolder": ".\\vendor\\bin",
+  "phpSniffer.autoDetect": true,
+  "phpSniffer.standard": ".\\.phpcs.xml.dist",
+  "files.eol": "\n"
+}

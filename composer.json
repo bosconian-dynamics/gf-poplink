@@ -1,0 +1,25 @@
+{
+    "name": "bosconian-dynamics/gf-hashlink",
+    "description": "Facilitates pre-population of Gravity Forms forms via hashed links.",
+    "type": "wordpress-plugin",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Adam Bosco",
+            "email": "github@adambos.co"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "BosconianDynamics\\GFHashLink\\": "inc"
+        }
+    },
+    "require": {
+        "php": ">=7.2.0"
+    },
+    "require-dev": {
+        "squizlabs/php_codesniffer": "^3.5",
+        "dealerdirect/phpcodesniffer-composer-installer": "^0.7.0",
+        "wp-coding-standards/wpcs": "^2.3"
+    }
+}
