@@ -43,6 +43,7 @@
 		<exclude name="Generic.ControlStructures.InlineControlStructure.NotAllowed" />
 		<exclude name="Generic.WhiteSpace.DisallowSpaceIndent" />
 		<exclude name="PSR2.Classes.PropertyDeclaration.Underscore" />
+		<exclude name="PSR2.ControlStructures.SwitchDeclaration.BreakIndent" />
 		<exclude name="PEAR.Functions.FunctionCallSignature.Indent" />
 		<exclude name="PEAR.Functions.FunctionCallSignature.OpeningIndent" />
 		<exclude name="Squiz.ControlStructures.ControlSignature.SpaceAfterCloseBrace" />
@@ -94,7 +95,7 @@
 		
 		<properties>
 			<property name="text_domain" type="array">
-				<element value="gf-hashlink"/>
+				<element value="gf-poplink"/>
 			</property>
 		</properties>
 	</rule>

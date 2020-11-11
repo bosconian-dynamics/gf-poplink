@@ -1,6 +1,6 @@
 {
-    "name": "bosconian-dynamics/gf-hashlink",
-    "description": "Facilitates pre-population of Gravity Forms forms via hashed links.",
+    "name": "bosconian-dynamics/gf-poplink",
+    "description": "Facilitates pre-population of Gravity Forms forms via tokens in requests.",
     "type": "wordpress-plugin",
     "license": "MIT",
     "authors": [
