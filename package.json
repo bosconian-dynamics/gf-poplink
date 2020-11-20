@@ -1,0 +1,31 @@
+{
+  "name": "gf-poplink",
+  "version": "0.1.0",
+  "description": "Gravity Forms addon adding strategies to populate forms via request parameters.",
+  "main": "src/index.js",
+  "scripts": {
+    "wp-env": "wp-env",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bosconian-dynamics/gf-poplink.git"
+  },
+  "keywords": [
+    "wordpress",
+    "plugin",
+    "gravityforms",
+    "link",
+    "url",
+    "population"
+  ],
+  "author": "Adam Bosco <github@adambos.co>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bosconian-dynamics/gf-poplink/issues"
+  },
+  "homepage": "https://github.com/bosconian-dynamics/gf-poplink#readme",
+  "devDependencies": {
+    "@wordpress/env": "^2.1.0"
+  }
+}

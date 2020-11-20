@@ -163,7 +163,7 @@ class GFPopLinkAddOn extends \GFAddOn {
     if( is_int( $form ) )
       $form = \GFAPI::get_form( $form );
 
-    return $form[ $this->_slug ];
+    return isset( $form[ $this->_slug ] ) && $form[ $this->_slug ];
   }
 
   /**
