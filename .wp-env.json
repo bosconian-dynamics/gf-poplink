@@ -2,6 +2,11 @@
   "core": null,
   "plugins": [
     ".",
-    "../gravityforms"
-  ]
+    "../gravityforms",
+    "dev4press/debugpress"
+  ],
+  "config": {
+    "WP_SITEURL": "https://gf-poplink.test",
+    "WP_HOMEURL": "https://gf-poplink.test"
+  }
 }
