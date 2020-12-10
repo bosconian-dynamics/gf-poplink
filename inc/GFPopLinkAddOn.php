@@ -148,16 +148,37 @@ class GFPopLinkAddOn extends \GFAddOn {
   public function init() {
     parent::init();
 
+    // TODO: redistribute some of these hooks to other initialization methods, e.g. admin_init()
+
     add_action( 'gform_pre_submission', [ $this, 'populate_fields' ] );
     add_action( 'gform_field_advanced_settings', [ $this, 'field_settings' ], 10, 2 );
     add_action( 'gform_editor_js', [ $this, 'register_field_settings_js' ] );
 
     add_filter( 'gform_pre_form_settings_save', [ $this, 'save_form_settings_fields' ] );
-    //add_filter( 'gform_tooltips', [ $this, 'register_tooltips' ] ); 
+    // TODO: add_filter( 'gform_tooltips', [ $this, 'register_tooltips' ] ); 
     add_filter( 'gform_field_value', [ $this, 'filter_field_value' ], 10, 2 );
     add_filter( 'gform_field_content', [ $this, 'disable_locked_inputs' ], 10, 2 );
+    add_filter( 'gform_form_actions', [ $this, 'form_action_links' ], 10, 2 );
+    add_filter( 'gform_toolbar_menu', [ $this, 'form_action_links' ], 10, 2 );
 
     add_action( 'wp_ajax_gf_poplink_encode_token', [ $this, 'encode_form_data_token' ] );
+  }
+
+  public function form_action_links( $links, $form_id ) {
+    if( !$this->is_form_poplink_enabled( $form_id ) )
+      return $links;
+      
+    $links['poplink_prepop'] = [
+      'label'        => __( 'Prepopulate', 'gf-poplink' ),
+      'aria-label'   => __( 'Pre-populate fields and generate a population link', 'gf-poplink' ),
+      'url'          => '#',
+      'icon'         => '<i class="fa fa-file-text-o fa-lg"></i>',
+      'capabilities' => 'gravityforms_edit_forms',
+      'menu_class'   => 'gf_poplink_prepop',
+      'priority'     => 650,
+    ];
+
+    return $links;
   }
 
   public function encode_form_data_token() {
@@ -170,9 +191,9 @@ class GFPopLinkAddOn extends \GFAddOn {
       'fields'  => [],
     ];
 
-    if( !$settings || !isset( $settings['enabled'] ) || $settings['enabled'] === '0' ) {
+    if( !$this->is_form_poplink_enabled( $form ) ) {
       wp_send_json_error([
-        'message' => __( 'Population Links are disabled for this form.', 'gf-poplinks' ),
+        'message' => __( 'Population Links are disabled for this form.', 'gf-poplink' ),
       ]);
     }
     
@@ -203,7 +224,7 @@ class GFPopLinkAddOn extends \GFAddOn {
   }
 
   public function get_form_settings( $form ) {
-    if( is_int( $form ) )
+    if( is_int( $form ) || is_string( $form ) )
       $form = \GFAPI::get_form( $form );
 
     return parent::get_form_settings( $form );
@@ -216,10 +237,9 @@ class GFPopLinkAddOn extends \GFAddOn {
    * @return void
    */
   public function populate_fields( $form ) {
-    $settings = $this->get_form_settings( $form );
     $form_id  = $form['id'];
 
-    if( ! $settings || ! $settings['enabled'] || $settings['enabled'] === '0' )
+    if( !$this->is_form_poplink_enabled( $form ) )
       return;
 
     foreach( $form['fields'] as $field ) {
@@ -270,9 +290,7 @@ class GFPopLinkAddOn extends \GFAddOn {
   }
 
   public function disable_locked_inputs( $content, $field ) {
-    $settings = $this->get_form_settings( $field['formId'] );
-
-    if( ! $settings || ! isset( $settings['enabled'] ) || $settings['enabled'] === '0' )
+    if( !$this->is_form_poplink_enabled( $field['formId'] ) )
       return $content;
 
     if( $this->is_field_locked( $field ) )
@@ -281,11 +299,17 @@ class GFPopLinkAddOn extends \GFAddOn {
     return $content;
   }
 
-  public function is_field_lockable( $field ) {
-    $settings = $this->get_form_settings( $field['formId'] );
+  public function is_form_poplink_enabled( $form ) {
+    $settings = $this->get_form_settings( $form );
 
-    if( ! $settings || ! isset( $settings['enabled'] ) || $settings['enabled'] === '0' )
+    return $settings && isset( $settings['enabled'] ) && $settings['enabled'] === '1';
+  }
+
+  public function is_field_lockable( $field ) {
+    if( !$this->is_form_poplink_enabled( $field['formId'] ) )
       return false;
+
+    $settings = $this->get_form_settings( $field['formId'] );
     
     return $field['poplink_prepop_lock'] || isset( $settings['lockall'] ) && $settings['lockall'] === '1';
   }
@@ -298,54 +322,27 @@ class GFPopLinkAddOn extends \GFAddOn {
     return $this->get_token_field_value( $field['formId'], $field['id'] ) !== null;
   }
 
+  public function load_template( $name, $args = [], $return = false, $require_once = false ) {
+    // TODO: theme override support
+
+    if( $return )
+      ob_start();
+    
+    \load_template(
+      $this->get_base_path() . '/inc/templates/' . $name,
+      $require_once,
+      $args
+    );
+
+    if( $return )
+      return ob_get_clean();
+  }
 
   public function field_settings( $position, $form_id ) {
     if( $position !== -1 )
       return;
-
-    ?>
-      <li class="field_setting poplink_field_settings">
-        <label class="section_label">
-          <?php esc_html_e( 'Population Links', 'gf-poplink' ); ?>
-          <?php gform_tooltip( 'form_field_poplink' ); ?>
-        </label>
-
-        <input type="checkbox" id="field_poplink_enable" />
-        <label for="field_poplink_enable" class="inline">
-          <?php esc_html_e( 'Allow field to be populated by request tokens', 'gf-poplink' ); ?>
-          <?php gform_tooltip( 'poplink_enable' ); ?>
-        </label>
-        <br />
-
-        <div id="poplink_container" style="display:none; padding-top:10px;">
-          <ul>
-            <li class="field_setting poplink_prepop_lock_field_setting">
-              <input type="checkbox" id="field_poplink_prepop_lock" />
-              <label for="field_poplink_prepop_lock" class="inline">
-                <?php esc_html_e( 'Disable field when pre-populated', 'gf-poplink' ) ?>
-                <?php gform_tooltip( 'poplink_prepop_lock' ) ?>
-              </label>
-            </li>
-
-            <!--<li class="field_setting poplink_hide_field_setting">
-              <input type="checkbox" id="field_poplink_hide" />
-              <label for="field_poplink_hide" class="inline">
-                <?php esc_html_e( 'Hide this field when pre-populated', 'gf-poplink' ) ?>
-                <?php gform_tooltip( 'poplink_hide' ) ?>
-              </label>
-            </li>
-
-            <li class="field_setting poplink_encrypt_field_setting">
-              <input type="checkbox" id="field_poplink_encrypt" />
-              <label for="field_poplink_encrypt" class="inline">
-                <?php esc_html_e( 'Encrypt this field\'s value in population tokens', 'gf-poplink' ) ?>
-                <?php gform_tooltip( 'poplink_encrypt' ) ?>
-              </label>
-            </li>-->
-          </ul>
-        </div>
-      </li>
-    <?php
+    
+    $this->load_template( 'field-settings.php' );
   }
 
   public function register_field_settings_js() {
@@ -377,10 +374,9 @@ class GFPopLinkAddOn extends \GFAddOn {
    */
   public function get_token_field_value( $form_id, $field_id ) {
     if( ! isset( $this->data[ $form_id ] ) ) {
-      $settings = $this->get_form_settings( $form_id );
-
-      if( $settings && $settings['enabled'] === '1' ) {
-        $token = filter_input(
+      if( $this->is_form_poplink_enabled( $form_id ) ) {
+        $settings = $this->get_form_settings( $form_id );
+        $token    = filter_input(
           \rgpost( $settings['param'] ) ? INPUT_POST : INPUT_GET, // phpcs:ignore WordPress.Security.NonceVerification.Missing
           $settings['param'],
           FILTER_SANITIZE_ENCODED
