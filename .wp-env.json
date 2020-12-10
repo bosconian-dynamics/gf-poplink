@@ -1,5 +1,7 @@
 {
   "core": null,
+  "phpVersion": null,
+  "port": 8888,
   "plugins": [
     ".",
     "../gravityforms",
@@ -7,6 +9,8 @@
   ],
   "config": {
     "WP_SITEURL": "https://gf-poplink.test",
-    "WP_HOMEURL": "https://gf-poplink.test"
+    "WP_HOMEURL": "https://gf-poplink.test",
+    "WP_DEBUG": true,
+    "SCRIPTS_DEBUG": true
   }
 }

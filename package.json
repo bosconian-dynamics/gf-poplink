@@ -5,7 +5,17 @@
   "main": "src/index.js",
   "scripts": {
     "wp-env": "wp-env",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "wp-scripts build",
+    "check-engines": "wp-scripts check-engines",
+    "check-licenses": "wp-scripts check-licenses",
+    "format:js": "wp-scripts format-js",
+    "lint:css": "wp-scripts lint-style",
+    "lint:js": "wp-scripts lint-js",
+    "lint:md:docs": "wp-scripts lint-md-docs",
+    "lint:md:js": "wp-scripts lint-md-js",
+    "lint:pkg-json": "wp-scripts lint-pkg-json",
+    "packages-update": "wp-scripts packages-update",
+    "start": "wp-scripts start"
   },
   "repository": {
     "type": "git",
@@ -26,6 +36,10 @@
   },
   "homepage": "https://github.com/bosconian-dynamics/gf-poplink#readme",
   "devDependencies": {
-    "@wordpress/env": "^2.1.0"
+    "@wordpress/env": "^2.1.0",
+    "@wordpress/scripts": "^12.5.0"
+  },
+  "dependencies": {
+    "jquery": "^3.5.1"
   }
 }
