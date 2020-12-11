@@ -7,6 +7,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 config.entry = {
   'form-admin': path.resolve( process.cwd(), 'src', 'form-admin.js' ),
   'frontend': path.resolve( process.cwd(), 'src', 'frontend.js' ),
+  'prepop': path.resolve( process.cwd(), 'src', 'prepop.js' ),
 };
 
 config.output = {

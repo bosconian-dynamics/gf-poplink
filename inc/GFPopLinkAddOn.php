@@ -153,15 +153,52 @@ class GFPopLinkAddOn extends \GFAddOn {
     add_action( 'gform_pre_submission', [ $this, 'populate_fields' ] );
     add_action( 'gform_field_advanced_settings', [ $this, 'field_settings' ], 10, 2 );
     add_action( 'gform_editor_js', [ $this, 'register_field_settings_js' ] );
+    add_action( 'gform_post_process', [ $this, 'handle_prepop_submission' ] ); // TODO: handle multi-page
 
     add_filter( 'gform_pre_form_settings_save', [ $this, 'save_form_settings_fields' ] );
     // TODO: add_filter( 'gform_tooltips', [ $this, 'register_tooltips' ] ); 
-    add_filter( 'gform_field_value', [ $this, 'filter_field_value' ], 10, 2 );
-    add_filter( 'gform_field_content', [ $this, 'disable_locked_inputs' ], 10, 2 );
+    add_filter( 'gform_field_value', [ $this, 'filter_field_value' ], 100, 2 );
+    add_filter( 'gform_field_content', [ $this, 'disable_prepopulated_inputs' ], 10, 2 );
     add_filter( 'gform_form_actions', [ $this, 'form_action_links' ], 10, 2 );
     add_filter( 'gform_toolbar_menu', [ $this, 'form_action_links' ], 10, 2 );
 
-    add_action( 'wp_ajax_gf_poplink_encode_token', [ $this, 'encode_form_data_token' ] );
+    add_action( 'wp_ajax_gf_poplink_encode_token', [ $this, 'ajax_encode_token' ] );
+  }
+
+  public function handle_prepop_submission( $form ) {
+    if( !$this->is_prepop() || !$this->is_form_poplink_enabled( $form ) )
+      return;
+    
+    $token = $this->encode_form_data_token( $form );
+    $param = $this->get_form_settings( $form )['param'];
+
+    if( \is_wp_error( $token ) ) {
+      $args = [
+        'success' => false,
+        'error'   => $token,
+      ];
+    }
+    else {
+      $args = [
+        'success' => true,
+        'token'   => $token,
+        'param'   => $param,
+      ];
+    }
+
+    // TODO: this is a temporary solution. A full template based off of Gravity Forms' preview.php
+    // would probably be ideal. Provide a form-level setting to override to a specific page or URL.
+    wp_die( $this->load_template( 'population-link.php', $args, true ) );
+  }
+
+  public function is_prepop() {
+    if( \rgget( 'gf_page' ) !== 'preview' )
+      return false;
+    
+    if( \rgget( 'poplink_prepop') != 1 )
+      return false;
+    
+    return true;
   }
 
   public function form_action_links( $links, $form_id ) {
@@ -171,9 +208,14 @@ class GFPopLinkAddOn extends \GFAddOn {
     $links['poplink_prepop'] = [
       'label'        => __( 'Prepopulate', 'gf-poplink' ),
       'aria-label'   => __( 'Pre-populate fields and generate a population link', 'gf-poplink' ),
-      'url'          => '#',
+      'url'          => '?gf_page=preview&poplink_prepop=1&id=' . $form_id,
+      'target'       => '_blank',
       'icon'         => '<i class="fa fa-file-text-o fa-lg"></i>',
-      'capabilities' => 'gravityforms_edit_forms',
+      'capabilities' => [ // TODO: custom capabilities
+        'gravityforms_edit_forms',
+			  'gravityforms_create_form',
+			  'gravityforms_preview_forms'
+      ],
       'menu_class'   => 'gf_poplink_prepop',
       'priority'     => 650,
     ];
@@ -181,26 +223,37 @@ class GFPopLinkAddOn extends \GFAddOn {
     return $links;
   }
 
-  public function encode_form_data_token() {
-    // TODO: nonce check
-    $form_id  = \rgpost( 'form_id' );
-    $form     = \GFAPI::get_form( $form_id );
+  public function ajax_encode_token() {
+    $form_id = \rgpost( 'form_id' );
+    $form    = \GFAPI::get_form( $form_id );
+    $token   = $this-> encode_form_data_token( $form );
+
+    if( \is_wp_error( $token ) )
+      wp_send_json_error( $token );
+    
+    $settings = $this->get_form_settings( $form );
+    
+    wp_send_json_success([
+      'token' => $token,
+      'param' => $settings['param'],
+    ]);
+  }
+
+  public function encode_form_data_token( $form ) {
     $settings = $this->get_form_settings( $form );
     $data     = [
-      'form_id' => $form_id,
+      'form_id' => $form['id'],
       'fields'  => [],
     ];
 
-    if( !$this->is_form_poplink_enabled( $form ) ) {
-      wp_send_json_error([
-        'message' => __( 'Population Links are disabled for this form.', 'gf-poplink' ),
-      ]);
-    }
+    if( !$this->is_form_poplink_enabled( $form ) )
+      return new \WP_Error( 'form-poplink-disabled', __( 'Population Links are disabled for this form.', 'gf-poplink' ) );
     
     foreach( $form['fields'] as $field ) {
       if( $field['poplink_enable'] === false )
         continue;
       
+      // TODO: this doesn't cover values for sub-inputs for things like checkbox and radio groups
       $input_id  = 'input_' . $field['id'];
 
       // TODO: improve sanitization
@@ -218,9 +271,7 @@ class GFPopLinkAddOn extends \GFAddOn {
         throw new \Error( 'Unknown token strategy "' . $settings['strategy'] . '"' );
     }
 
-    wp_send_json_success([
-      'token' => $token
-    ]);
+    return $token;
   }
 
   public function get_form_settings( $form ) {
@@ -262,6 +313,7 @@ class GFPopLinkAddOn extends \GFAddOn {
   public function scripts() {
     $form_admin = include $this->get_base_path() . '/build/form-admin.asset.php';
     $frontend   = include $this->get_base_path() . '/build/frontend.asset.php';
+    $prepop     = include $this->get_base_path() . '/build/prepop.asset.php';
 
     return array_merge(
       parent::scripts(),
@@ -272,7 +324,7 @@ class GFPopLinkAddOn extends \GFAddOn {
           'version' => $form_admin['version'],
           'deps'    => $form_admin['dependencies'],
           'enqueue' => [
-            'admin_page' => 'form_editor',
+            [ 'admin_page' => 'form_editor' ],
           ],
         ],
         [
@@ -282,19 +334,46 @@ class GFPopLinkAddOn extends \GFAddOn {
           'deps'    => $frontend['dependencies'],
           // TODO: possibly a callback to check poplink settings for the frontend form
           /*'enqueue' => [
-            'admin_page' => 'form_editor'
+            [ 'admin_page' => 'form_editor' ]
           ]*/
         ],
+        [
+          'handle'  => 'gf-poplink_prepop',
+          'src'     => $this->get_base_url() . '/build/prepop.js',
+          'version' => $prepop['version'],
+          'deps'    => $prepop['dependencies'],
+          'enqueue' => [
+            [ 'query' => 'gf_page=preview&poplink_prepop=1&id=_notempty_' ]
+          ],
+        ]
       ]
     );
   }
 
-  public function disable_locked_inputs( $content, $field ) {
+  public function disable_prepopulated_inputs( $content, $field ) {
+    if( $this->is_form_editor() )
+      return $content;
+
     if( !$this->is_form_poplink_enabled( $field['formId'] ) )
       return $content;
 
-    if( $this->is_field_locked( $field ) )
-      return str_replace( '<input ', '<input disabled="disabled" ', $content );
+    if( $this->is_field_locked( $field ) ) {
+      $content = str_replace(
+        [
+          '<input ',
+          '<textarea ',
+          '<select ',
+        ],
+        [
+          '<input disabled="disabled" ',
+          '<textarea disabled="disabled" ',
+          '<select disabled="disabled" '
+        ],
+        $content
+      );
+
+      return $content;
+    }
     
     return $content;
   }
@@ -323,7 +402,8 @@ class GFPopLinkAddOn extends \GFAddOn {
   }
 
   public function load_template( $name, $args = [], $return = false, $require_once = false ) {
-    // TODO: theme override support
+    // TODO: locate_template theme override support
+    $args['poplink'] = $this;
 
     if( $return )
       ob_start();
@@ -388,7 +468,7 @@ class GFPopLinkAddOn extends \GFAddOn {
           else
             throw new \Error( 'Unknown token strategy "' . $settings['strategy'] . '"' );
 
-          $this->data[ $form_id ] = $token['dat'];
+          $this->data[ $form_id ] = $token['dat']['fields'];
         }
         else {
           $this->data[ $form_id ] = false;
@@ -416,6 +496,7 @@ class GFPopLinkAddOn extends \GFAddOn {
    * @return mixed
    */
   public function filter_field_value( $value, $field ) {
+    // TODO: check field poplink_enable
     $form_id     = $field['formId'];
     $token_value = $this->get_token_field_value( $form_id, $field['id'] );
 
