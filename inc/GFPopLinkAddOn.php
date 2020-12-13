@@ -122,6 +122,8 @@ class GFPopLinkAddOn extends \GFAddOn {
   }
 
   public function init_admin() {
+    parent::init_admin();
+
     if( $this->is_prepop() ) {
       if( !\is_user_logged_in() )
         \auth_redirect();
@@ -210,7 +212,7 @@ class GFPopLinkAddOn extends \GFAddOn {
       return;
 
     foreach( $form['fields'] as $field ) {
-      if( $field['poplink_enable'] === false )
+      if( $field['allowsPrepopulate'] != '1' )
         continue;
       
       $input_id  = 'input_' . $field['id'];
@@ -345,7 +347,7 @@ class GFPopLinkAddOn extends \GFAddOn {
   }
 
   public function field_settings( $position ) {
-    if( $position !== -1 )
+    if( $position !== 500 )
       return;
     
     $this->load_template( 'field-settings.php' );

@@ -1,22 +1,21 @@
-      <li class="field_setting poplink_field_settings">
-        <label class="section_label">
-          <?php esc_html_e( 'Population Links', 'gf-poplink' ); ?>
-          <?php gform_tooltip( 'form_field_poplink' ); ?>
-        </label>
+      <li class="field_setting poplink_field_settings" style="padding-top:0;">
+        <div id="poplink_container" style="display:none;">
+          <!--<label class="section_label">
+            <?php esc_html_e( 'Population Links', 'gf-poplink' ); ?>
+            <?php gform_tooltip( 'form_field_poplink' ); ?>
+          </label>-->
 
-        <input type="checkbox" id="field_poplink_enable" />
-        <label for="field_poplink_enable" class="inline">
-          <?php esc_html_e( 'Allow field to be populated by request tokens', 'gf-poplink' ); ?>
-          <?php gform_tooltip( 'poplink_enable' ); ?>
-        </label>
-        <br />
+          <!--<input type="checkbox" id="field_poplink_enable" />
+          <label for="field_poplink_enable" class="inline">
+            <?php esc_html_e( 'Allow field to be populated by token', 'gf-poplink' ); ?>
+            <?php gform_tooltip( 'poplink_enable' ); ?>
+          </label>-->
 
-        <div id="poplink_container" style="display:none; padding-top:10px;">
           <ul>
             <li class="field_setting poplink_prepop_lock_field_setting">
               <input type="checkbox" id="field_poplink_prepop_lock" />
               <label for="field_poplink_prepop_lock" class="inline">
-                <?php esc_html_e( 'Disable field when pre-populated', 'gf-poplink' ) ?>
+                <?php esc_html_e( 'Disable field when pre-populated by token', 'gf-poplink' ) ?>
                 <?php gform_tooltip( 'poplink_prepop_lock' ) ?>
               </label>
             </li>

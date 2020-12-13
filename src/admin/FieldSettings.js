@@ -19,19 +19,21 @@ export class FieldSettings {
     );
   }
 
+  isPrepopEnabled() {
+    return GetSelectedField()[ 'allowsPrepopulate' ];
+  }
+
   init() {
     this.$container = jQuery( '#poplink_container' );
 
-    // TODO: pretty much everything below should be localized into self-contained FieldSetting subclasses
-    this.settings.enable.$input.on(
+    // Show or hide poplink field settings when "Allow prepopulate" setting changes
+    jQuery( '#field_prepopulate' ).on(
       'click',
-      () => {
-        this.settings.enable.save();
-
-        if( this.settings.enable.value === false )
-          this.$container.hide();
+      ({target: {checked}}) => {
+        if( checked )
+          this.$container.slideDown();
         else
-          this.$container.show();
+          this.$container.slideUp();
       }
     );
   }
@@ -52,10 +54,10 @@ export class FieldSettings {
       this.settings.prepop_lock.$input.prop( 'checked', true );
     }
 
-    // Show or hide the sub-settings container dependent on poplinks being enabled for this form.
-    if( this.settings.enable.value === false )
-      this.$container.hide();
-    else
+    // Show or hide the sub-settings container dependent on prepopulation being enabled for this field.
+    if( this.isPrepopEnabled() )
       this.$container.show();
+    else
+      this.$container.hide();
   }
 }
