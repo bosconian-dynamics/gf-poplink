@@ -445,7 +445,9 @@ class GFPopLinkAddOn extends \GFAddOn {
    * @return mixed
    */
   public function filter_field_value( $value, $field ) {
-    // TODO: check field poplink_enable
+    if( $field['allowsPrepopulate'] != 1 )
+      return $value;
+
     $form_id     = $field['formId'];
     $token_value = $this->get_token_field_value( $form_id, $field['id'] );
 
