@@ -113,7 +113,7 @@ class GFPopLinkAddOn extends \GFAddOn {
     add_action( 'gform_field_advanced_settings', [ $this, 'field_settings' ] );
     add_action( 'gform_editor_js', [ $this, 'register_field_settings_js' ] );
 
-    add_filter( 'gform_pre_form_settings_save', [ $this, 'save_form_settings_fields' ] );
+    //add_filter( 'gform_pre_form_settings_save', [ $this, 'save_form_settings_fields' ] );
     // TODO: add_filter( 'gform_tooltips', [ $this, 'register_tooltips' ] ); 
     add_filter( 'gform_field_value', [ $this, 'filter_field_value' ], 100, 2 );
     add_filter( 'gform_field_content', [ $this, 'disable_prepopulated_inputs' ], 10, 2 );
@@ -121,9 +121,15 @@ class GFPopLinkAddOn extends \GFAddOn {
     add_filter( 'gform_toolbar_menu', [ $this, 'form_action_links' ], 10, 2 );
   }
 
+  /**
+   * {@inheritDoc}
+   * 
+   * @return void
+   */
   public function init_admin() {
     parent::init_admin();
 
+    // Handle routing for the dedicated prepopulation form
     if( $this->is_prepop() ) {
       if( !\is_user_logged_in() )
         \auth_redirect();
@@ -148,6 +154,12 @@ class GFPopLinkAddOn extends \GFAddOn {
     }
   }
 
+  /**
+   * Retrieves the population strategy instance configured for a form.
+   * 
+   * @param \GF_Form|integer|string $form
+   * @return IPopulationStrategy|null The respective strategy instance.
+   */
   public function get_strategy( $form ) {
     if( is_numeric( $form ) )
       $form = \GFAPI::get_form( $form );
@@ -174,6 +186,14 @@ class GFPopLinkAddOn extends \GFAddOn {
     return \is_admin() && !\rgempty( self::FORM_PARAM, $_GET );
   }
 
+  /**
+   * Filter to add links to the dedicated prepopulation form to action lists in Gravity Forms
+   * screens.
+   * 
+   * @param array          $links The original array of action link objects.
+   * @param integer|string $form_id The ID of the current form.
+   * @return array The modified action links array.
+   */
   public function form_action_links( $links, $form_id ) {
     if( !$this->is_form_poplink_enabled( $form_id ) )
       return $links;
@@ -192,15 +212,21 @@ class GFPopLinkAddOn extends \GFAddOn {
     return $links;
   }
 
+  /**
+   * {@inheritDoc}
+   * 
+   * @param \GF_Form|integer|string $form
+   * @return array
+   */
   public function get_form_settings( $form ) {
-    if( is_int( $form ) || is_string( $form ) )
+    if( is_numeric( $form ) )
       $form = \GFAPI::get_form( $form );
 
     return parent::get_form_settings( $form );
   }
 
   /**
-   * On form submission, overwrite any submitted values with those set by token.
+   * On form submission, overwrite any submitted values for locked fields with those set by token.
    *
    * @param \GF_Form $form
    * @return void
@@ -252,6 +278,11 @@ class GFPopLinkAddOn extends \GFAddOn {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   * 
+   * @return array An array of script configuration arrays for this addon's assets.
+   */
   public function scripts() {
     $form_admin = include $this->get_base_path() . '/build/form-admin.asset.php';
     $frontend   = include $this->get_base_path() . '/build/frontend.asset.php';
@@ -292,6 +323,14 @@ class GFPopLinkAddOn extends \GFAddOn {
     );
   }
 
+  /**
+   * Filters form input elements to disable them if they've been prepopulated by a token and are
+   * configured to do so.
+   * 
+   * @param string $content
+   * @param array $field
+   * @return string
+   */
   public function disable_prepopulated_inputs( $content, $field ) {
     if( $this->is_form_editor() )
       return $content;
@@ -320,12 +359,24 @@ class GFPopLinkAddOn extends \GFAddOn {
     return $content;
   }
 
+  /**
+   * Checks if this addon's functionality is enabled for the referenced form.
+   * 
+   * @param \GF_Form|integer|string $form
+   * @return boolean
+   */
   public function is_form_poplink_enabled( $form ) {
     $settings = $this->get_form_settings( $form );
 
     return $settings && isset( $settings['enabled'] ) && $settings['enabled'] === '1';
   }
 
+  /**
+   * Checks if a field is configured to lock/disable when it's been pre-populated by a token.
+   * 
+   * @param array $field
+   * @return boolean
+   */
   public function is_field_lockable( $field ) {
     if( !$this->is_form_poplink_enabled( $field['formId'] ) )
       return false;
@@ -335,14 +386,37 @@ class GFPopLinkAddOn extends \GFAddOn {
     return $field['poplink_prepop_lock'] || isset( $settings['lockall'] ) && $settings['lockall'] === '1';
   }
 
+  /**
+   * Checks if a field is both configured to lock/disable and is locked/disabled by being
+   * prepopulated by a token.
+   * 
+   * @param array $field
+   * @return boolean
+   */
   public function is_field_locked( $field ) {
     return $this->is_field_lockable( $field ) && $this->is_field_prepopulated( $field );
   }
 
+  /**
+   * Checks if a field has a prepopulated value in the token data cache
+   * 
+   * @param array $field
+   * @return boolean
+   */
   public function is_field_prepopulated( $field ) {
     return $this->get_token_field_value( $field['formId'], $field['id'] ) !== null;
   }
 
+  /**
+   * Loads the specified template file from the templates/ directory.
+   * 
+   * @param string $name The path to the file relative to the templates/ directory.
+   * @param array $args Additional data to pass into the template in the $args variable.
+   * @param boolean $return Whether to return the interpreted template as a string, or to print it.
+   * @param boolean $permit_override Attempt to load overriding an template from the active theme.
+   * @param boolean $require_once
+   * @return string|void
+   */
   public function load_template( $name, $args = [], $return = false, $permit_override = false, $require_once = false ) {
     $template = $this->get_base_path() . '/inc/templates/' . $name;
     
@@ -370,6 +444,12 @@ class GFPopLinkAddOn extends \GFAddOn {
       return ob_get_clean();
   }
 
+  /**
+   * An action to print out field settings.
+   * 
+   * @param $position
+   * @return void
+   */
   public function field_settings( $position ) {
     if( $position !== 500 )
       return;
@@ -377,6 +457,9 @@ class GFPopLinkAddOn extends \GFAddOn {
     $this->load_template( 'field-settings.php' );
   }
 
+  /**
+   * Undocumented function
+   */
   public function register_field_settings_js() {
     // TODO: consider abstracting general field attributes into a JSON file for use in PHP and JS.
     ?>
@@ -544,9 +627,5 @@ class GFPopLinkAddOn extends \GFAddOn {
         ],
       ],
     ];
-  }
-
-  public function save_form_settings_fields( $form ) {
-    return $form;
   }
 }
