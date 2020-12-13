@@ -119,8 +119,6 @@ class GFPopLinkAddOn extends \GFAddOn {
     add_filter( 'gform_field_content', [ $this, 'disable_prepopulated_inputs' ], 10, 2 );
     add_filter( 'gform_form_actions', [ $this, 'form_action_links' ], 10, 2 );
     add_filter( 'gform_toolbar_menu', [ $this, 'form_action_links' ], 10, 2 );
-
-    add_action( 'wp_ajax_gf_poplink_encode_token', [ $this, 'ajax_encode_token' ] );
   }
 
   public function init_admin() {
