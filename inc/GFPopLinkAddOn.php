@@ -149,6 +149,9 @@ class GFPopLinkAddOn extends \GFAddOn {
   }
 
   public function get_strategy( $form ) {
+    if( is_numeric( $form ) )
+      $form = \GFAPI::get_form( $form );
+    
     $form_id = $form['id'];
 
     if( !isset( $this->strategies[ $form_id ] ) ) {
@@ -388,12 +391,9 @@ class GFPopLinkAddOn extends \GFAddOn {
         );
 
         if( $token ) {
-          if( $settings['strategy'] === 'jwt' )
-            $token = $this->decode_jwt( $token );
-          else
-            throw new \Error( 'Unknown token strategy "' . $settings['strategy'] . '"' );
+          $data = $this->get_strategy( $form_id )->deserialize( $token );
 
-          $this->data[ $form_id ] = $token['dat']['fields'];
+          $this->data[ $form_id ] = $data['dat']['fields'];
         }
         else {
           $this->data[ $form_id ] = false;
