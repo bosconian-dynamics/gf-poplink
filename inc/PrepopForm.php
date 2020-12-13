@@ -97,35 +97,33 @@ class PrepopForm {
     $data = [];
 
     foreach( $this->form['fields'] as $field ) {
-      if( !$field['allowsPrepopulate'] )
+      if( $field['allowsPrepopulate'] != 1 )
         continue;
       
+      $input_name = 'input_' . $field['id'];
+      
       if( $field['type'] === 'checkbox' ) {
-        $choice_number = 0;
+        $choice_number       = 0;
+        $data[ $input_name ] = [];
 
         for( $i = 0; $i < count( $field['choices'] ); $i++ ) {
           // Gravity Forms checkbox input indexes skip multiples of 10, so the choice index cannot
           //   be used directly.
-          if( $choice_number > 0 && $choice_number % 10 === 0 )
+          if( $choice_number % 10 === 0 )
             $choice_number++;
           
-          $input_name = 'input_' . $field['id'] . '.' . $choice_number++;
-
-          if( \rgempty( $input_name, $_POST ) )
-            continue;
-          
-          $data[ $input_name ] = \rgpost( $input_name );
+          $choice_name = $input_name . '_' . $choice_number++;
+          $data[ $input_name ][] = \rgempty( $choice_name, $_POST )
+            ? ''
+            : \rgpost( $choice_name );
         }
-
-        continue;
       }
-
-      $input_name = 'input_' . $field['id'];
-      
-      if( \rgempty( $input_name, $_POST ) )
-        continue;
-      
-      $data[ $input_name ] = \rgpost( $input_name );
+      else {
+        if( \rgempty( $input_name, $_POST ) )
+          continue;
+        
+        $data[ $input_name ] = \rgpost( $input_name );
+      }
     }
 
     return $data;

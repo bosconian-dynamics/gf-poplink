@@ -212,11 +212,35 @@ class GFPopLinkAddOn extends \GFAddOn {
       return;
 
     foreach( $form['fields'] as $field ) {
-      if( $field['allowsPrepopulate'] != '1' )
+      if( $field['allowsPrepopulate'] != 1 )
         continue;
+
+      if( $field['type'] === 'checkbox' ) {
+        $choice_number = 0;
+
+        for( $i = 0; $i < count( $field['choices'] ); $i++ ) {
+          // Gravity Forms checkbox input indexes skip multiples of 10, so the choice index cannot
+          //   be used directly.
+          if( $choice_number > 0 && $choice_number % 10 === 0 )
+            $choice_number++;
+          
+          $input_id   = $field['id'] . '_' . $choice_number++; 
+          $input_val  = \rgpost( 'input_' . $input_id );
+
+          if( !$this->is_field_locked( $field ) && !empty( $input_val ) )
+            continue;
+          
+          $token_value = $this->get_token_field_value( $form_id, $input_id );
+
+          if( $token_value !== null )
+            $_POST[ 'input_' . $input_id ] = $token_value;
+        }
+
+        continue;
+      }
       
-      $input_id  = 'input_' . $field['id'];
-      $input_val = \rgpost( $input_id );
+      $input_name  = 'input_' . $field['id'];
+      $input_val = \rgpost( $input_name );
       
       if( !$this->is_field_locked( $field ) && !empty( $input_val ) )
         continue;
@@ -224,7 +248,7 @@ class GFPopLinkAddOn extends \GFAddOn {
       $token_value = $this->get_token_field_value( $form_id, $field['id'] );
 
       if( $token_value !== null )
-        $_POST[ $input_id ] = $token_value;
+        $_POST[ $input_name ] = $token_value;
     }
   }
 
