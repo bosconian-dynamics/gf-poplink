@@ -14,6 +14,8 @@
 
 namespace BosconianDynamics\GFPopLink;
 
+require_once __DIR__ . '/vendor/autoload.php';
+
 /**
  * Print an error to admin notices if Gravity Forms or the GF Addon Framework appear to be absent.
  *

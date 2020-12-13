@@ -7,18 +7,35 @@
 
 namespace BosconianDynamics\GFPopLink;
 
+use \BosconianDynamics\GFPopLink\IPopulationStrategy;
+use \BosconianDynamics\GFPopLink\PrepopForm;
+use \BosconianDynamics\GFPopLink\strategies\JWTStrategy;
+
 \GFForms::include_addon_framework();
 
 /**
  * GFPopLinkAddOn
  */
 class GFPopLinkAddOn extends \GFAddOn {
+  const CAPABILITIES = [
+    'gravityforms_edit_forms',
+		'gravityforms_create_form'
+  ];
+  const FORM_PARAM = 'gf_prepop';
+
   /**
    * Cache for field data decoded from incoming tokens.
    *
-   * @var string $_version
+   * @var array $data
    */
-  protected $data;
+  protected $data = [];
+
+  /**
+   * Mapping of form IDs to IPopulationStrategy objects.
+   * 
+   * @var array $strategies
+   */
+  protected $strategies = [];
 
   /**
    * {@inheritDoc}
@@ -83,64 +100,6 @@ class GFPopLinkAddOn extends \GFAddOn {
   }
 
   /**
-   * Undocumented function
-   *
-   * @param \WP_Post|number $post
-   * @param array|null      $data Data to sign and encode into the JWT.
-   * @param integer|null    $expiration Timestamp at which the JWT should expire.
-   * @return string
-   */
-  public function encode_jwt( $data = null, $expiration = null ) {
-    $payload['iat'] = time();
-
-    if( $data )
-      $payload['dat'] = $data;
-
-    if( isset( $expiration ) )
-      $payload['exp'] = $expiration;
-
-    $payload = base64_encode( \wp_json_encode( $payload ) ); //phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
-    $hash    = \wp_hash( $payload, 'nonce' );
-
-    return rawurlencode( $payload . '.' . $hash );
-  }
-
-  public function decode_jwt( $token ) {
-    if( empty( $token ) || -1 === strpos( $token, '.' ) )
-      return false;
-
-    $token            = rawurldecode( $token );
-    [$payload, $hash] = explode( '.', $token );
-
-    // If the payload or the hash is missing, the token's invalid.
-    if( empty( $payload ) || empty( $hash ) )
-      return false;
-
-    $hash_check = \wp_hash( $payload, 'nonce' );
-
-    // Has the payload and/or hash been modified since the token was issued?
-    if( $hash_check !== $hash )
-      return false;
-
-    $payload = base64_decode( $payload ); //phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
-
-    if( ! $payload )
-      return false;
-
-    $payload = json_decode( $payload, true );
-
-    if( ! $payload )
-      return false;
-
-    // Does the payload have an expiration date - if so, has it expired?
-    if( ! empty( $payload['exp'] ) && $payload['exp'] > time() )
-      return false;
-
-    // Token validated - return the payload as legitimate data.
-    return $payload;
-  }
-
-  /**
    * {@inheritDoc}
    *
    * @return void
@@ -151,9 +110,8 @@ class GFPopLinkAddOn extends \GFAddOn {
     // TODO: redistribute some of these hooks to other initialization methods, e.g. admin_init()
 
     add_action( 'gform_pre_submission', [ $this, 'populate_fields' ] );
-    add_action( 'gform_field_advanced_settings', [ $this, 'field_settings' ], 10, 2 );
+    add_action( 'gform_field_advanced_settings', [ $this, 'field_settings' ] );
     add_action( 'gform_editor_js', [ $this, 'register_field_settings_js' ] );
-    add_action( 'gform_post_process', [ $this, 'handle_prepop_submission' ] ); // TODO: handle multi-page
 
     add_filter( 'gform_pre_form_settings_save', [ $this, 'save_form_settings_fields' ] );
     // TODO: add_filter( 'gform_tooltips', [ $this, 'register_tooltips' ] ); 
@@ -165,40 +123,52 @@ class GFPopLinkAddOn extends \GFAddOn {
     add_action( 'wp_ajax_gf_poplink_encode_token', [ $this, 'ajax_encode_token' ] );
   }
 
-  public function handle_prepop_submission( $form ) {
-    if( !$this->is_prepop() || !$this->is_form_poplink_enabled( $form ) )
-      return;
-    
-    $token = $this->encode_form_data_token( $form );
-    $param = $this->get_form_settings( $form )['param'];
+  public function init_admin() {
+    if( $this->is_prepop() ) {
+      if( !\is_user_logged_in() )
+        \auth_redirect();
+      
+      if( !\GFAPI::current_user_can_any( self::CAPABILITIES ) )
+        \wp_die( esc_html__( 'You don\'t have adequate permission to prepopulate forms.', 'gf-poplink' ) );
 
-    if( \is_wp_error( $token ) ) {
-      $args = [
-        'success' => false,
-        'error'   => $token,
-      ];
+      $form = \GFAPI::get_form( \rgget( self::FORM_PARAM ) );
+      
+      if( !$this->is_form_poplink_enabled( $form ) )
+        \wp_die( esc_html__( 'Population tokens are not enabled for this form.', 'gf-poplink' )  );
+      
+      $settings = $this->get_form_settings( $form );
+
+      $prepop = new PrepopForm(
+        $form,
+        $settings,
+        $this->get_strategy( $form )
+      );
+
+      $prepop->load();
     }
-    else {
-      $args = [
-        'success' => true,
-        'token'   => $token,
-        'param'   => $param,
-      ];
+  }
+
+  public function get_strategy( $form ) {
+    $form_id = $form['id'];
+
+    if( !isset( $this->strategies[ $form_id ] ) ) {
+      $settings = $this->get_form_settings( $form );
+
+      switch( $settings['strategy'] ) {
+        case 'jwt':
+          $this->strategies[ $form_id ] = new JWTStrategy( $form, $settings );
+          break;
+        
+        default:
+          throw new \Error( 'Unkown population strategy "' . $settings['strategy'] . '"' );
+      }
     }
 
-    // TODO: this is a temporary solution. A full template based off of Gravity Forms' preview.php
-    // would probably be ideal. Provide a form-level setting to override to a specific page or URL.
-    wp_die( $this->load_template( 'population-link.php', $args, true ) );
+    return $this->strategies[ $form_id ];
   }
 
   public function is_prepop() {
-    if( \rgget( 'gf_page' ) !== 'preview' )
-      return false;
-    
-    if( \rgget( 'poplink_prepop') != 1 )
-      return false;
-    
-    return true;
+    return \is_admin() && !\rgempty( self::FORM_PARAM, $_GET );
   }
 
   public function form_action_links( $links, $form_id ) {
@@ -208,70 +178,15 @@ class GFPopLinkAddOn extends \GFAddOn {
     $links['poplink_prepop'] = [
       'label'        => __( 'Prepopulate', 'gf-poplink' ),
       'aria-label'   => __( 'Pre-populate fields and generate a population link', 'gf-poplink' ),
-      'url'          => '?gf_page=preview&poplink_prepop=1&id=' . $form_id,
+      'url'          => '?' . self::FORM_PARAM . '=' . $form_id,
       'target'       => '_blank',
       'icon'         => '<i class="fa fa-file-text-o fa-lg"></i>',
-      'capabilities' => [ // TODO: custom capabilities
-        'gravityforms_edit_forms',
-			  'gravityforms_create_form',
-			  'gravityforms_preview_forms'
-      ],
+      'capabilities' => self::CAPABILITIES,
       'menu_class'   => 'gf_poplink_prepop',
       'priority'     => 650,
     ];
 
     return $links;
-  }
-
-  public function ajax_encode_token() {
-    $form_id = \rgpost( 'form_id' );
-    $form    = \GFAPI::get_form( $form_id );
-    $token   = $this-> encode_form_data_token( $form );
-
-    if( \is_wp_error( $token ) )
-      wp_send_json_error( $token );
-    
-    $settings = $this->get_form_settings( $form );
-    
-    wp_send_json_success([
-      'token' => $token,
-      'param' => $settings['param'],
-    ]);
-  }
-
-  public function encode_form_data_token( $form ) {
-    $settings = $this->get_form_settings( $form );
-    $data     = [
-      'form_id' => $form['id'],
-      'fields'  => [],
-    ];
-
-    if( !$this->is_form_poplink_enabled( $form ) )
-      return new \WP_Error( 'form-poplink-disabled', __( 'Population Links are disabled for this form.', 'gf-poplink' ) );
-    
-    foreach( $form['fields'] as $field ) {
-      if( $field['poplink_enable'] === false )
-        continue;
-      
-      // TODO: this doesn't cover values for sub-inputs for things like checkbox and radio groups
-      $input_id  = 'input_' . $field['id'];
-
-      // TODO: improve sanitization
-      $value = \rgpost( $input_id );
-
-      if( $value !== null && $value !== '' )
-        $data['fields'][ $input_id ] = $value;
-    }
-
-    switch( $settings['strategy'] ) {
-      case 'jwt':
-        $token = $this->encode_jwt( $data ); // TODO: expiration form setting
-        break;
-      default:
-        throw new \Error( 'Unknown token strategy "' . $settings['strategy'] . '"' );
-    }
-
-    return $token;
   }
 
   public function get_form_settings( $form ) {
@@ -343,7 +258,7 @@ class GFPopLinkAddOn extends \GFAddOn {
           'version' => $prepop['version'],
           'deps'    => $prepop['dependencies'],
           'enqueue' => [
-            [ 'query' => 'gf_page=preview&poplink_prepop=1&id=_notempty_' ]
+            [ 'query' => self::FORM_PARAM . '=_notempty_' ]
           ],
         ]
       ]
@@ -401,24 +316,34 @@ class GFPopLinkAddOn extends \GFAddOn {
     return $this->get_token_field_value( $field['formId'], $field['id'] ) !== null;
   }
 
-  public function load_template( $name, $args = [], $return = false, $require_once = false ) {
-    // TODO: locate_template theme override support
+  public function load_template( $name, $args = [], $return = false, $permit_override = false, $require_once = false ) {
+    $template = $this->get_base_path() . '/inc/templates/' . $name;
+    
+    if( $permit_override ) {
+      $located = \locate_template(
+        [
+          'gravityforms/' . $name,
+          'gf-poplink/' . $name,
+          $name
+        ]
+      );
+
+      if( $located )
+        $template = $located;
+    }
+
     $args['poplink'] = $this;
 
     if( $return )
       ob_start();
     
-    \load_template(
-      $this->get_base_path() . '/inc/templates/' . $name,
-      $require_once,
-      $args
-    );
+    \load_template( $template, $require_once, $args );
 
     if( $return )
       return ob_get_clean();
   }
 
-  public function field_settings( $position, $form_id ) {
+  public function field_settings( $position ) {
     if( $position !== -1 )
       return;
     

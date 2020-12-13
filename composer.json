@@ -11,7 +11,7 @@
     ],
     "autoload": {
         "psr-4": {
-            "BosconianDynamics\\GFHashLink\\": "inc"
+            "BosconianDynamics\\GFPopLink\\": "inc"
         }
     },
     "require": {
