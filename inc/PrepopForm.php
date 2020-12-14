@@ -9,6 +9,7 @@ class PrepopForm {
     'index.php'
   ];
 
+  protected $addon;
   protected $form;
   protected $id;
   protected $settings;
@@ -16,7 +17,8 @@ class PrepopForm {
   protected $title;
   protected $virtual_post;
 
-  function __construct( $form, $settings, $strategy ) {
+  function __construct( $form, $settings, $strategy, $addon ) {
+    $this->addon    = $addon;
     $this->form     = $form;
     $this->id       = $form['id'];
     $this->settings = $settings;
@@ -41,7 +43,7 @@ class PrepopForm {
 
     if( $this->is_submission() ) {
       // Handle prepopulation submission
-      $data = $this->get_form_data();
+      $data = $this->addon->get_form_data( $this->form, false );
       $token = $this->strategy->serialize([
         'form_id' => $this->id,
         'fields'  => $data
@@ -93,42 +95,6 @@ class PrepopForm {
     $this->load_template();
 
     exit();
-  }
-
-  public function get_form_data() {
-    $data = [];
-
-    foreach( $this->form['fields'] as $field ) {
-      if( $field['allowsPrepopulate'] != 1 )
-        continue;
-      
-      $input_name = 'input_' . $field['id'];
-      
-      if( $field['type'] === 'checkbox' ) {
-        $choice_number       = 0;
-        $data[ $input_name ] = [];
-
-        for( $i = 0; $i < count( $field['choices'] ); $i++ ) {
-          // Gravity Forms checkbox input indexes skip multiples of 10, so the choice index cannot
-          //   be used directly.
-          if( $choice_number % 10 === 0 )
-            $choice_number++;
-          
-          $choice_name = $input_name . '_' . $choice_number++;
-          $data[ $input_name ][] = \rgempty( $choice_name, $_POST )
-            ? ''
-            : \rgpost( $choice_name );
-        }
-      }
-      else {
-        if( \rgempty( $input_name, $_POST ) )
-          continue;
-        
-        $data[ $input_name ] = \rgpost( $input_name );
-      }
-    }
-
-    return $data;
   }
 
   public function load_template( $args = [] ) {

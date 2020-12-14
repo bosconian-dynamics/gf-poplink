@@ -150,7 +150,8 @@ class GFPopLinkAddOn extends \GFAddOn {
       $prepop = new PrepopForm(
         $form,
         $settings,
-        $this->get_strategy( $form )
+        $this->get_strategy( $form ),
+        $this
       );
 
       $prepop->load();
