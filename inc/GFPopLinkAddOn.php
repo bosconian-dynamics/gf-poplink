@@ -111,7 +111,9 @@ class GFPopLinkAddOn extends \GFAddOn {
 
     add_action( 'gform_pre_submission', [ $this, 'populate_fields' ] );
     add_action( 'gform_field_advanced_settings', [ $this, 'field_settings' ] );
-    add_action( 'gform_editor_js', [ $this, 'register_field_settings_js' ] );
+    add_action( 'gform_editor_js', [ $this, 'register_field_settings_js' ] ); // TODO: would be nice to find a way to handle this with a static asset
+    add_action( 'gform_enqueue_scripts', [ $this, 'enqueue_form_scripts' ] );
+    add_action( 'wp_ajax_poplink_serialize_formdata', [ $this, 'ajax_serialize_formdata' ] );
 
     //add_filter( 'gform_pre_form_settings_save', [ $this, 'save_form_settings_fields' ] );
     // TODO: add_filter( 'gform_tooltips', [ $this, 'register_tooltips' ] ); 
@@ -119,6 +121,7 @@ class GFPopLinkAddOn extends \GFAddOn {
     add_filter( 'gform_field_content', [ $this, 'disable_prepopulated_inputs' ], 10, 2 );
     add_filter( 'gform_form_actions', [ $this, 'form_action_links' ], 10, 2 );
     add_filter( 'gform_toolbar_menu', [ $this, 'form_action_links' ], 10, 2 );
+    add_filter( 'gform_submit_button', [ $this, 'form_footer_buttons' ], 10, 2 );
   }
 
   /**
@@ -152,6 +155,60 @@ class GFPopLinkAddOn extends \GFAddOn {
 
       $prepop->load();
     }
+  }
+
+  /**
+   * Asynchronous request handler to serialize a form's inputs into a token.
+   * 
+   * @return void
+   */
+  public function ajax_serialize_formdata() {
+    if( \rgempty( 'form_id' ) )
+      \wp_send_json_error( null, 400 );
+    
+    if( !\GFAPI::current_user_can_any( self::CAPABILITIES ) ) {
+      \wp_send_json_error( [
+        'message' => __( 'You don\'t have adequate permission to prepopulate forms.', 'gf-poplink' )
+      ], 403 );
+    }
+    
+    $form_id = \rgpost( 'form_id' );
+    $form = \GFAPI::get_form( $form_id );
+
+    if( !$this->is_form_poplink_enabled( $form ) ) {
+      \wp_send_json_error([
+        'message' => __( 'This form does not have Population Links enabled', 'gf-poplink' )
+      ]);
+    }
+      
+    $token = $this->get_strategy( $form )->serialize([
+      'form_id' => $form_id,
+      'fields'  => $this->get_form_data( $form, false )
+    ]);
+
+    // TODO: add details about any fields thrown out of the token due to not permitting prepopulation
+    \wp_send_json_success([
+      'message' => __( 'Population token encoded successfully!', 'gf-poplink' ),
+      'token'   => $token,
+      'param'   => $this->get_form_settings( $form )['param']
+    ]);
+  }
+
+  /**
+   * Filters the Gravity Forms Submit button in order to add a prepopulation button if the form and
+   * current user's capabilities qualify.
+   * 
+   * @param string $submit_button
+   * @param \GF_Form $form
+   * @return string
+   */
+  public function form_footer_buttons( $submit_button, $form ) {
+    if( !\GFAPI::current_user_can_any( self::CAPABILITIES ) || !$this->is_form_poplink_enabled( $form ) )
+      return $submit_button;
+    
+    $prepop_button = '<input type="button" id="poplink_poptoken_button" class="gform_button button" value="' . __('Generate Population Link', 'gf-poplink') . '">';
+    
+    return $submit_button . $prepop_button;
   }
 
   /**
@@ -232,49 +289,107 @@ class GFPopLinkAddOn extends \GFAddOn {
    * @return void
    */
   public function populate_fields( $form ) {
-    $form_id  = $form['id'];
+    $_POST = array_merge(
+      $_POST,
+      $this->get_form_data( $form, true )
+    );
+  }
+
+  /**
+   * Get form input values, optionally with token prepopulation.
+   * 
+   * @param \GF_Form|integer|string $form
+   * @param boolean $prepopulate
+   * @param string $compound_delimiter
+   * @return array
+   */
+  public function get_form_data( $form, $prepopulate = false, $compound_delimiter = '_' ) {
+    if( is_numeric( $form ) )
+      $form = \GFAPI::get_form( $form );
+    
+    $data    = [];
+    $form_id = $form['id'];
 
     if( !$this->is_form_poplink_enabled( $form ) )
-      return;
+      return $data;
 
     foreach( $form['fields'] as $field ) {
       if( $field['allowsPrepopulate'] != 1 )
         continue;
+      
+      $input_name = 'input_' . $field['id'];
 
+      if( $prepopulate ) {
+        $data[ $input_name ] = $this->get_token_field_value( $form_id, $field['id'] );
+
+        if( $this->is_field_locked( $field ) )
+          continue;
+      }
+
+      // TODO: there are other compound field types that need to be handled. There's gotta be
+      //   an API function for this nonsense!
       if( $field['type'] === 'checkbox' ) {
-        $choice_number = 0;
+        $choice_number       = 0;
+        $data[ $input_name ] = [];
 
         for( $i = 0; $i < count( $field['choices'] ); $i++ ) {
-          // Gravity Forms checkbox input indexes skip multiples of 10, so the choice index cannot
-          //   be used directly.
-          if( $choice_number > 0 && $choice_number % 10 === 0 )
+          if( $choice_number % 10 === 0 )
             $choice_number++;
           
-          $input_id   = $field['id'] . '_' . $choice_number++; 
-          $input_val  = \rgpost( 'input_' . $input_id );
-
-          if( !$this->is_field_locked( $field ) && !empty( $input_val ) )
-            continue;
-          
-          $token_value = $this->get_token_field_value( $form_id, $input_id );
-
-          if( $token_value !== null )
-            $_POST[ 'input_' . $input_id ] = $token_value;
+          $choice_name           = $input_name . $compound_delimiter . $choice_number++;
+          $data[ $input_name ][] = \rgpost( $choice_name );
         }
 
         continue;
       }
-      
-      $input_name  = 'input_' . $field['id'];
-      $input_val = \rgpost( $input_name );
-      
-      if( !$this->is_field_locked( $field ) && !empty( $input_val ) )
-        continue;
 
-      $token_value = $this->get_token_field_value( $form_id, $field['id'] );
+      if( !\rgempty( $input_name ) )
+        $data[ $input_name ] = \rgpost( $input_name );
+    }
 
-      if( $token_value !== null )
-        $_POST[ $input_name ] = $token_value;
+    return $data;
+  }
+
+  /**
+   * Conditionally enqueue scripts for specific forms. Right now, simply responsible for enqueuing
+   * the script to handle prepopulation functionality.
+   * 
+   * TODO: frontend script - if needed - should be moved here, since Gravity Forms enqueue
+   *   conditionals don't have an option to specify specific forms.
+   * 
+   * @param \GF_Form
+   * @return void
+   */
+  public function enqueue_form_scripts( $form ) {
+    if( $this->is_form_poplink_enabled( $form ) && \GFAPI::current_user_can_any( self::CAPABILITIES ) ) {
+      if( $this->is_prepop() )
+        return;
+      
+      $asset_info    = include $this->get_base_path() . '/build/prepop.asset.php';
+      $script_handle = 'gf-poplink_prepop';
+
+      \wp_enqueue_script(
+        $script_handle,
+        $this->get_base_url() . '/build/prepop.js',
+        array_merge(
+          $asset_info[ 'dependencies' ],
+          [ 'jquery-ui-core', 'jquery-ui-dialog' ] // TODO: migrate these to webpack externs or @wordpress/dependency-extraction-webpack-plugin... or just implement a modal without jquery.
+        ),
+        $asset_info[ 'version' ]
+      );
+      \wp_localize_script(
+        $script_handle,
+        'poplink_prepop',
+        [
+          'ajax_url' => \admin_url( 'admin-ajax.php' ),
+          'nonce'    => \wp_create_nonce( 'poplink_prepop' ),
+          'strings'  => [
+            'copy_button' => __( 'Copy Link to Clipboard', 'gf-poplink' )
+          ]
+        ]
+      );
+
+      \wp_enqueue_style( 'wp-jquery-ui-dialog' );
     }
   }
 
@@ -285,8 +400,7 @@ class GFPopLinkAddOn extends \GFAddOn {
    */
   public function scripts() {
     $form_admin = include $this->get_base_path() . '/build/form-admin.asset.php';
-    $frontend   = include $this->get_base_path() . '/build/frontend.asset.php';
-    $prepop     = include $this->get_base_path() . '/build/prepop.asset.php';
+    //$frontend   = include $this->get_base_path() . '/build/frontend.asset.php';
 
     return array_merge(
       parent::scripts(),
@@ -300,25 +414,12 @@ class GFPopLinkAddOn extends \GFAddOn {
             [ 'admin_page' => 'form_editor' ],
           ],
         ],
-        [
+        /*[
           'handle'  => 'gf-poplink_frontend',
           'src'     => $this->get_base_url() . '/build/frontend.js',
           'version' => $frontend['version'],
-          'deps'    => $frontend['dependencies'],
-          // TODO: possibly a callback to check poplink settings for the frontend form
-          /*'enqueue' => [
-            [ 'admin_page' => 'form_editor' ]
-          ]*/
-        ],
-        [
-          'handle'  => 'gf-poplink_prepop',
-          'src'     => $this->get_base_url() . '/build/prepop.js',
-          'version' => $prepop['version'],
-          'deps'    => $prepop['dependencies'],
-          'enqueue' => [
-            [ 'query' => self::FORM_PARAM . '=_notempty_' ]
-          ],
-        ]
+          'deps'    => $frontend['dependencies']
+        ]*/
       ]
     );
   }
@@ -528,6 +629,7 @@ class GFPopLinkAddOn extends \GFAddOn {
    * @return mixed
    */
   public function filter_field_value( $value, $field ) {
+    // TODO: this is getting hit up even when composing an AJAX response...
     if( $field['allowsPrepopulate'] != 1 )
       return $value;
 
