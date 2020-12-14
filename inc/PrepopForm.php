@@ -83,6 +83,8 @@ class PrepopForm {
       );
     }
 
+    \wp_enqueue_script( 'jquery' );
+
     $this->setup_query();
 
     \do_action( 'wp', $wp );
