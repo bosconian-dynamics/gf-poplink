@@ -1,10 +1,9 @@
 {
   "core": null,
-  "phpVersion": null,
+  "phpVersion": "7.4",
   "plugins": [
     ".",
-    "../gravityforms",
-    "dev4press/debugpress"
+    "../gravityforms"
   ],
   "config": {
     "WP_DEBUG": true,
