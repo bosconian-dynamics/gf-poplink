@@ -29,3 +29,6 @@ vendor/
 
 # wp-env configuration override
 .wp-env.override.json
+
+# VSCode workspace
+.vscode/
