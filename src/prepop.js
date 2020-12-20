@@ -29,6 +29,7 @@ jQuery(() => {
     () => {
       const data = new FormData( form );
 
+      data.delete( 'gform_ajax' ); // Remove the Gravity Forms AJAX submission querystring to prevent GF intercepting the request.
       data.append( 'action', 'poplink_serialize_formdata' );
       data.append( '_ajax_nonce', config.nonce );
       data.append( 'form_id', 1 );
