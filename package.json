@@ -1,6 +1,6 @@
 {
   "name": "gf-poplink",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Gravity Forms addon adding strategies to populate forms via request parameters.",
   "main": "src/index.js",
   "scripts": {

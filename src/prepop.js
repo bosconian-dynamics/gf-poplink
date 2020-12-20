@@ -1,5 +1,7 @@
 import jQuery from 'jquery';
 
+const addQueryArg = ( key, value, querystring = '' ) => `${querystring}${querystring.length ? '&' : '?'}${key}=${value}`;
+
 jQuery(() => {
   const config = window.poplink_prepop;
   const $button = jQuery('#poplink_poptoken_button');
@@ -29,7 +31,10 @@ jQuery(() => {
     () => {
       const data = new FormData( form );
 
-      data.delete( 'gform_ajax' ); // Remove the Gravity Forms AJAX submission querystring to prevent GF intercepting the request.
+      // Remove the Gravity Forms AJAX submission querystring to prevent GF intercepting the request.
+      if( data.has( 'gform_ajax' ) )
+        data.delete( 'gform_ajax' ); 
+
       data.append( 'action', 'poplink_serialize_formdata' );
       data.append( '_ajax_nonce', config.nonce );
       data.append( 'form_id', 1 );
@@ -53,9 +58,9 @@ jQuery(() => {
               return;
             }
 
-            const { protocol, host, pathname } = window.location;
+            const { protocol, host, pathname, search } = window.location;
             
-            $link.val( `${protocol}//${host}${pathname}?${param}=${token}` );
+            $link.val( `${protocol}//${host}${pathname}${addQueryArg(param, token, search)}` );
             $modal.dialog( 'open' );
           }
         }

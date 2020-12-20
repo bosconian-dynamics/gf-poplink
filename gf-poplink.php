@@ -3,7 +3,7 @@
  * Plugin Name:       GF Population Link
  * Plugin URI:        https://github.com/bosconian-dynamics/gf-poplink
  * Description:       Provides strategies and options to pre-populate Gravity Forms forms.
- * Version:           0.1.0
+ * Version:           0.1.1
  * Requires at least: 5.2
  * Requires PHP:      7.2
  * Author:            Adam Bosco <wordpress@adambos.co>
