@@ -19,7 +19,7 @@ export class FieldSettings {
 	}
 
 	isPrepopEnabled() {
-		return GetSelectedField()[ 'allowsPrepopulate' ];
+		return GetSelectedField()?.allowsPrepopulate;
 	}
 
 	init() {

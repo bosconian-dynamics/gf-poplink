@@ -1,7 +1,7 @@
 import { FieldSettings } from './admin/FieldSettings';
 import { FieldSetting } from './admin/FieldSetting';
 
-globalThis.poplink = new FieldSettings(
+new FieldSettings(
 	/*new FieldSetting(
     'enable',
     {

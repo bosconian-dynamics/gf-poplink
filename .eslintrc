@@ -1,0 +1,14 @@
+{
+  "extends": [ "plugin:@wordpress/eslint-plugin/recommended" ],
+  "rules": {
+    "no-shadow": "off"
+  },
+  "globals": {
+    "GetSelectedField": "readonly",
+    "SetFieldProperty": "readonly"
+  },
+  "env": {
+    "node": true,
+    "browser": true
+  }
+}
