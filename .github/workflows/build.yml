@@ -2,7 +2,7 @@ name: Build WordPress Plugin
 
 on:
   push:
-    branches: [ master, tooling-github-actions-build ]
+    branches: [ master ]
   release:
     type: [ created ]
   #pull_request:
@@ -185,6 +185,7 @@ jobs:
         path: |
           readme.txt
           README.md
+          LICENSE
           vendor/
           build/
           *.php
