@@ -1,5 +1,9 @@
 # Gravity Forms Population Links AddOn
+![Build WordPress Plugin](https://github.com/bosconian-dynamics/gf-poplink/workflows/Build%20WordPress%20Plugin/badge.svg)
+
 A GravityForms AddOn adding strategies and options for pre-populating form fields by links and tokens.
+
+The latest feature release is available for download from [the Releases page](https://github.com/bosconian-dynamics/gf-poplink/releases). A build reflecting more recent states of the repository are available for download as a ["Build WordPress Plugin" workflow](https://github.com/bosconian-dynamics/gf-poplink/actions?query=workflow%3A%22Build+WordPress+Plugin%22) artifact attached to successful runs.
 
 ### Features
  - Pre-populate forms with stateless JWT tokens appended to a URL
