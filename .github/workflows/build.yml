@@ -1,0 +1,224 @@
+name: Build WordPress Plugin
+
+on:
+  push:
+    branches: [ master, tooling-github-actions-build ]
+  release:
+    type: [ created ]
+  #pull_request:
+  #  branches: [ master ]
+
+jobs:
+  setup_dev_env:
+    name: Setup Project Development Environment
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Validate composer.json and composer.lock
+      run: composer validate
+    
+    - name: Cache Composer development dependencies
+      id: composer-cache
+      uses: actions/cache@v2
+      with:
+        path: vendor
+        key: ${{ runner.os }}-composer-dev-deps-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-composer-dev-deps-
+
+    - name: Install Composer development dependencies
+      if: steps.composer-cache.outputs.cache-hit != 'true'
+      run: composer install --dev --prefer-source --no-progress --no-suggest --no-interaction
+  
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v2
+      with:
+        node-version: 14.x
+        check-latest: true
+
+    - name: Cache NPM development dependencies
+      id: npm-cache
+      uses: actions/cache@v2
+      with:
+        path: node_modules
+        key: ${{ runner.os }}-npm-dev-deps-${{ hashFiles('**/package-lock.json') }}
+        restore-keys:
+          ${{ runner.os }}-npm-dev-deps-
+
+    - name: Install NPM development dependencies
+      if: steps.npm-cache.outputs.cache-hit != 'true'
+      run: npm install --production=false
+  
+    #- name: Lint package.json
+    #  run: npm run lint:pkg-json
+
+  #lint_styles:
+  #  name: Lint Styles
+  #  runs-on: ubuntu-latest
+  #  needs: setup_dev_env
+  #  steps:
+  #  - uses: actions/checkout@v2
+  #
+  #  - name: Setup Node.js environment
+  #    uses: actions/setup-node@v2
+  #    with:
+  #      node-version: 14.x
+  # 
+  #  - name: Load NPM development dependency cache
+  #    id: npm-cache
+  #    uses: actions/cache@v2
+  #    with:
+  #      path: node_modules
+  #      key: ${{ runner.os }}-npm-dev-deps-${{ hashFiles('**/package-lock.json') }}
+  #      restore-keys:
+  #        ${{ runner.os }}-npm-dev-deps-
+  #
+  #  - name: Lint Styles
+  #    run: npm run lint:css
+
+  lint_scripts:
+    name: Lint Scripts
+    runs-on: ubuntu-latest
+    needs: setup_dev_env
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v2
+      with:
+        node-version: 14.x
+      
+    - name: Load NPM development dependency cache
+      id: npm-cache
+      uses: actions/cache@v2
+      with:
+        path: node_modules
+        key: ${{ runner.os }}-npm-dev-deps-${{ hashFiles('**/package-lock.json') }}
+        restore-keys:
+          ${{ runner.os }}-npm-dev-deps-
+      
+    - name: Lint Scripts
+      run: npm run lint:js
+
+  build_composer:
+    name: Cache Composer Production Dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Validate composer.json and composer.lock
+      run: composer validate
+
+    - name: Cache Composer production dependencies
+      id: composer-cache
+      uses: actions/cache@v2
+      with:
+        path: vendor
+        key: ${{ runner.os }}-composer-prod-deps-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-composer-prod-deps-
+
+    - name: Install Composer dependencies
+      if: steps.composer-cache.outputs.cache-hit != 'true'
+      run: composer install --prefer-dist --no-progress --no-suggest --no-dev --no-interaction --optimize-autoloader
+  
+  build_npm:
+    name: Build Webpack Assets
+    runs-on: ubuntu-latest
+    needs: setup_dev_env
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Load NPM development dependency cache
+      id: npm-cache
+      uses: actions/cache@v2
+      with:
+        path: node_modules
+        key: ${{ runner.os }}-npm-dev-deps-${{ hashFiles('**/package-lock.json') }}
+        restore-keys:
+          ${{ runner.os }}-npm-dev-deps-
+    
+    - name: Cache built Webpack assets
+      id: asset-cache
+      uses: actions/cache@v2
+      with:
+        path: build
+        key: ${{ runner.os }}-assets-${{ hashFiles('build/**') }}
+        restore-keys:
+          ${{ runner.os }}-assets-
+
+    - name: Build JS, CSS, and manifest files
+      if: steps.asset-cache.outputs.cache-hit != 'true'
+      run: npm run build
+
+  build_plugin:
+    name: Build WordPress Plugin Archive
+    runs-on: ubuntu-latest
+    needs: [build_composer, build_npm]
+    if: needs.build_composer.result == 'success' && needs.build_npm.result == 'success'
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Load Composer production dependency cache
+      uses: actions/cache@v2
+      with:
+        path: vendor
+        key: ${{ runner.os }}-composer-prod-deps-${{ hashFiles('**/composer.lock') }}
+        restore-keys:
+          ${{ runner.os }}-composer-prod-deps-
+      
+    - name: Load Webpack build asset cache
+      uses: actions/cache@v2
+      with:
+        path: build
+        key: ${{ runner.os }}-assets-${{ hashFiles('build/**') }}
+        restore-keys:
+          ${{ runner.os }}-assets-
+
+    - name: Build artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: gf-poplink-${{ github.sha }}
+        path: |
+          readme.txt
+          README.md
+          vendor/
+          build/
+          *.php
+          inc/
+          src/
+
+  release:
+    name: Upload Build Artifact to Release
+    runs-on: ubuntu-latest
+    needs: build_plugin
+    if: github.event_name == 'release'
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Get release info
+      id: release_info
+      uses: bruceadams/get-release@v1.2.2
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+
+    - name: Download plugin artifact
+      id: download_artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: gf-poplink-${{ github.sha }}
+    
+    - name: Upload plugin artifact to release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      with:
+        upload_url: ${{ steps.release_info.outputs.upload_url }}
+        asset_path: ${{ steps.download_artifact.outputs.download-path }}
+        asset_name: gf-poplink.zip
+        asset_content_type: application/zip
+        
