@@ -37,6 +37,9 @@
 	<!-- Add in some extra rules from other standards. -->
 	<rule ref="Generic.CodeAnalysis.UnusedFunctionParameter"/>
 	<rule ref="Generic.Commenting.Todo"/>
+	<rule ref="Squiz.PHP.CommentedOutCode.Found">
+		<type>warning</type>
+	</rule>
 
 	<rule ref="WordPress">
 		<exclude name="Generic.Arrays.DisallowShortArraySyntax" />
@@ -81,9 +84,14 @@
 	-->
 	<config name="minimum_supported_wp_version" value="5.2"/>
 
+	<rule ref="WordPress.Files.FileName">
+		<properties>
+			<property name="is_theme" value="false"/>
+		</properties>
+	</rule>
+
 	<rule ref="WordPress.WP.I18n">
 		<exclude name="WordPress.WP.I18n.MissingTranslatorsComment" />
-		
 		<properties>
 			<property name="text_domain" type="array">
 				<element value="gf-poplink"/>

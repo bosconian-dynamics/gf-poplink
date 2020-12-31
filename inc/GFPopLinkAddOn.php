@@ -435,12 +435,14 @@ class GFPopLinkAddOn extends \GFAddOn {
 						[ 'admin_page' => 'form_editor' ],
 					],
 				],
-				/*[
+				/**
+				  [
 					'handle'  => 'gf-poplink_frontend',
 					'src'     => $this->get_base_url() . '/build/frontend.js',
 					'version' => $frontend['version'],
 					'deps'    => $frontend['dependencies']
-					]*/
+					]
+				*/
 			]
 		);
 	}
@@ -534,7 +536,7 @@ class GFPopLinkAddOn extends \GFAddOn {
 	 * @param array   $args Additional data to pass into the template in the $args variable.
 	 * @param boolean $return Whether to return the interpreted template as a string, or to print it.
 	 * @param boolean $permit_override Attempt to load overriding an template from the active theme.
-	 * @param boolean $require_once
+	 * @param boolean $require_once Use require_once instead of require.
 	 * @return string|void
 	 */
 	public function load_template( $name, $args = [], $return = false, $permit_override = false, $require_once = false ) {
@@ -711,14 +713,16 @@ class GFPopLinkAddOn extends \GFAddOn {
 								'label' => esc_html__( 'JSON Web Token', 'gf-poplink' ),
 								'value' => 'jwt',
 							],
-							/*[
+							/**
+							[
 								'label' => esc_html__( 'Encrypted Data Token', 'gf-poplink' ),
 								'value' => 'encrypted',
 							],
 							[
 								'label' => esc_html__( 'Database Token', 'gf-poplink' ),
 								'value' => 'database',
-							],*/
+							],
+							*/
 						],
 					],
 					[
