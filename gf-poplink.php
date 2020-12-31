@@ -19,18 +19,27 @@ namespace BosconianDynamics\GFPopLink;
 require_once __DIR__ . '/vendor/autoload.php';
 
 /**
+ * Public addon instance accessor.
+ *
+ * @return GFpoplinkAddOn
+ */
+function addon() {
+	return GFPopLinkAddOn::get_instance();
+}
+
+/**
  * Check for new releases on the GitHub repo.
  *
  * @return void
  */
 function check_for_updates() {
-  $puc = \Puc_v4_Factory::buildUpdateChecker(
-    'https://github.com/bosconian-dynamics/gf-poplink/',
-    __FILE__,
-    'gf-poplink'
-  );
+	$puc = \Puc_v4_Factory::buildUpdateChecker(
+		'https://github.com/bosconian-dynamics/gf-poplink/',
+		__FILE__,
+		'gf-poplink'
+	);
 
-  $puc->getVcsApi()->enableReleaseAssets();
+	$puc->getVcsApi()->enableReleaseAssets();
 }
 
 \add_action( 'plugins_loaded', __NAMESPACE__ . '\check_for_updates' );
@@ -41,10 +50,10 @@ function check_for_updates() {
  * @return void
  */
 function check_gf_dependency() {
-  if( method_exists( 'GFForms', 'include_addon_framework' ) )
-    return;
+	if( method_exists( 'GFForms', 'include_addon_framework' ) )
+	return;
 
-  echo '<div class="notice notice-error"><p>' . __( 'The GF Population Link plugin depends on Gravity Forms.', 'gf-poplink' ) . '</p></div>';
+	echo '<div class="notice notice-error"><p>' . \esc_html__( 'The GF Population Link plugin depends on Gravity Forms.', 'gf-poplink' ) . '</p></div>';
 }
 
 \add_action( 'admin_notices', __NAMESPACE__ . '\check_gf_dependency' );
@@ -55,21 +64,12 @@ function check_gf_dependency() {
  * @return void
  */
 function load() {
-  if( ! method_exists( 'GFForms', 'include_addon_framework' ) )
-    return;
+	if( ! method_exists( 'GFForms', 'include_addon_framework' ) )
+	return;
 
-  require_once __DIR__ . '/inc/GFPopLinkAddOn.php';
+	require_once __DIR__ . '/inc/GFPopLinkAddOn.php';
 
-  \GFAddOn::register( __NAMESPACE__ . '\GFPopLinkAddOn' );
+	\GFAddOn::register( __NAMESPACE__ . '\GFPopLinkAddOn' );
 }
 
 \add_action( 'gform_loaded', __NAMESPACE__ . '\load', 5 );
-
-/**
- * Public addon instance accessor.
- *
- * @return GFpoplinkAddOn
- */
-function addon() {
-  return GFPopLinkAddOn::get_instance();
-}

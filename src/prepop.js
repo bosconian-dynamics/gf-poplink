@@ -8,7 +8,7 @@ jQuery( () => {
 	const $button = jQuery( '#poplink_poptoken_button' );
 	const form = $button[ 0 ].form;
 	const $modal = jQuery(
-		'<div><p>Encoding token...</p><input type="text" readonly value="https://google.com/?s=test" /></div>'
+		'<div><p>Encoding token...</p><input type="text" readonly /></div>'
 	);
 	const $msg = $modal.children( 'p' );
 	const $link = $modal.children( 'input' );

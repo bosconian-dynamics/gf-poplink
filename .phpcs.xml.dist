@@ -57,15 +57,6 @@
 		<exclude name="WordPress.WhiteSpace.PrecisionAlignment" />
 	</rule>
 
-	<rule ref="Generic.WhiteSpace.ScopeIndent">
-		<properties>
-			<property name="indent" value="2"/>
-			<property name="tabIndent" value="false"/>
-		</properties>
-	</rule>
-	
-	<rule ref="Generic.WhiteSpace.DisallowTabIndent" />
-
 	<!-- Check for PHP cross-version compatibility. -->
 	<!--
 	To enable this, the PHPCompatibilityWP standard needs
