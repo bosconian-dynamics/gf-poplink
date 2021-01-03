@@ -118,4 +118,4 @@ jobs:
           ${{ runner.os }}-composer-dev-deps-
 
     - name: PHPCS
-      run: ./vendor/bin/phpcs ./gf-poplink.php ./inc
+      run: ./vendor/bin/phpcs --runtime-set ignore_warnings_on_exit 1 ./gf-poplink.php ./inc
