@@ -1,5 +1,6 @@
 # Gravity Forms Population Links AddOn
-![Build WordPress Plugin](https://github.com/bosconian-dynamics/gf-poplink/workflows/Build%20WordPress%20Plugin/badge.svg)
+![Plugin Build](https://github.com/bosconian-dynamics/gf-poplink/workflows/Build%20WordPress%20Plugin/badge.svg)
+![Linting](https://github.com/bosconian-dynamics/gf-poplink/workflows/Lint/badge.svg)
 
 A GravityForms AddOn adding strategies and options for pre-populating form fields by links and tokens.
 
